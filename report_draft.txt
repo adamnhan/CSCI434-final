@@ -1,0 +1,83 @@
+CSCI 434 Final Project Report Draft
+
+Title
+Classifying Website Origins From Encrypted Network Traffic Using Statistical Window Features
+
+Abstract
+Encrypted web traffic hides URLs and payload contents, but packet-level metadata still reveals structural patterns that can distinguish websites. In this project, we study whether website origin can be inferred from encrypted traffic captures without using payload data or explicit URL information. We collected repeated Wireshark capture sessions from five websites: ChatGPT, GitHub, Instagram, NBC News, and Walmart. Each capture was converted into fixed-size packet windows, and for each window we extracted statistical features describing packet lengths, timing behavior, protocol composition, and traffic direction. We evaluated several classification models, including a dummy baseline, logistic regression, and random forest. Early random window-level splits produced unrealistically strong results, so we redesigned the evaluation to use session-aware splits and a blind test set. In the final blind evaluation, the balanced random forest model achieved 0.740 window-level accuracy and 0.738 macro F1 on previously unseen session-05 captures, with 0.800 session-level accuracy using majority voting across windows. Feature ablation showed that packet-size and directionality features were more useful than session-duration features, and removing capture duration slightly improved blind-test performance. These results suggest that encrypted traffic metadata still carries meaningful website-specific information, while also showing that careful evaluation design is necessary to avoid overstating model performance.
+
+Introduction
+Modern web traffic is increasingly encrypted, which protects user privacy by hiding payload contents and many application-layer details. However, encryption does not completely remove all observable structure from network communication. Packet sizes, timing patterns, protocol mix, and directional behavior remain visible to a passive observer. As a result, encrypted traffic analysis remains an important problem in networking and security, both for understanding what information leakage is still possible and for studying how traffic characteristics vary across applications and websites.
+
+The goal of this project is to classify the originating website of encrypted network traffic without using the website URL or payload contents. We focus on five websites with noticeably different traffic behaviors: ChatGPT, GitHub, Instagram, NBC News, and Walmart. For each website, we collected multiple capture sessions using Wireshark and exported the packet traces as CSV files. Rather than treating individual packets as training samples, we grouped packets into fixed-size windows and extracted aggregate features from each window. These features summarize the statistical behavior of the traffic while preserving a consistent tabular representation for machine learning.
+
+An important challenge in this project was avoiding misleading evaluation. Our initial experiments used random train-test splits over packet windows, which produced nearly perfect scores. After closer inspection, we found that this setup allowed windows from the same capture session to appear in both training and testing, causing strong leakage and overly optimistic results. We therefore switched to session-aware evaluation and later introduced a blind test set using untouched capture sessions. This change produced a more realistic and defensible estimate of generalization.
+
+The main contributions of this project are as follows. First, we built a multi-session encrypted traffic dataset from five real websites using repeated Wireshark captures. Second, we engineered a feature set based on packet-size statistics, inter-arrival timing, protocol composition, and traffic directionality. Third, we compared baseline and non-baseline classifiers under both naive and session-aware evaluation settings. Finally, we performed blind-test and feature-ablation analyses to better understand which features are truly predictive and which ones behave more like artifacts of the collection process.
+
+Proposed Method
+
+Data Collection
+We collected encrypted website traffic using Wireshark on a client machine while visiting one website at a time. Each browsing session was recorded as a separate capture file in order to preserve independence between visits and support session-aware evaluation. We focused on five website labels: ChatGPT, GitHub, Instagram, NBC News, and Walmart. For each label, we collected multiple sessions and saved them with session identifiers such as chatgpt_00 through chatgpt_05. Using separate sessions was critical because combining visits into a single long recording would make it difficult to define clean train-test splits and would reduce the credibility of the evaluation.
+
+The traffic was filtered to HTTPS-related communication using TCP port 443 and UDP port 443. This allowed the captures to include both conventional TLS-over-TCP traffic and modern QUIC-based traffic over UDP. As expected, Wireshark labeled some packets as QUIC, which is consistent with the UDP 443 filter and reflects modern web behavior rather than a collection error. The final dataset contains repeated sessions for all five websites, although the number of packets per session varies significantly across captures.
+
+Preprocessing and Sample Construction
+Each Wireshark CSV export was parsed into a structured packet table. From the raw columns, we extracted normalized fields including packet time, packet length, protocol label, source and destination addresses, and source and destination ports. We also inferred approximate traffic direction based on conventional HTTPS port usage. Packets sent from a client-side port to destination port 443 were treated as outbound, while packets originating from port 443 and returning to a client-side port were treated as inbound.
+
+Instead of modeling individual packets directly, we grouped packets into fixed-size windows of 75 packets. Windows smaller than 40 packets were discarded. This produced a consistent sample representation while reducing the risk that the model would memorize packet-level noise. Each window inherited the label and session identifier of its source capture. Because some sessions were much larger than others, we also created a balanced version of the dataset by capping each capture at 120 sampled windows. This prevented very large sessions from dominating the training distribution.
+
+Feature Engineering
+For each packet window, we computed a set of aggregate features that capture statistical and structural properties of the traffic. Packet-size features included mean, standard deviation, minimum, maximum, median, 90th percentile, entropy, and ratios of small, medium, large, and jumbo packet lengths. Timing features included mean, standard deviation, maximum, and 90th percentile of inter-arrival times, as well as ratios of zero-gap, fast, medium, and slow packet intervals.
+
+We also computed protocol-composition features such as UDP ratio, TCP ratio, TLS 1.2 ratio, and TLS 1.3 ratio. Direction-related features included inbound ratio, outbound ratio, direction balance, direction change ratio, and statistics over runs of repeated traffic direction. Additional features captured port behavior, address diversity, and IPv6 usage. During later ablation experiments, we specifically tested whether features such as capture duration and packet rate were overly influential. The results showed that packet-size and directionality features were more important than session-duration features, and removing capture duration slightly improved blind-test performance.
+
+Models
+We evaluated three models. The first was a dummy classifier that always predicts the most frequent class, which serves as a minimal baseline. The second was logistic regression, which provides a linear baseline with standard scaling and median imputation. The third was a random forest classifier, which can model nonlinear relationships and interactions among features without requiring strong distributional assumptions. Random forest consistently performed best in the more realistic evaluation settings, so it became the main model in the final analysis.
+
+Evaluation Design
+Evaluation design changed substantially over the course of the project. In early experiments, we used a random split over packet windows. This produced artificially high performance because windows from the same recording could appear in both training and testing. To address this issue, we moved to session-aware splits where entire capture sessions were held out.
+
+For final development and testing, we used sessions 00 through 04 as the development pool and reserved session 05 for each website as a blind test set. No feature decisions or model tuning were supposed to depend on the blind test sessions. We report both window-level metrics and session-level majority-vote metrics. Window-level evaluation measures how well the model classifies individual packet windows, while session-level evaluation aggregates predictions over all windows in a held-out capture and uses majority vote to predict the website label for the full session.
+
+Evaluation
+
+Development Results
+Once the dataset contained multiple sessions per website, session-aware evaluation produced much more realistic results than the earlier random splits. Under the balanced session-aware setup, the random forest model achieved approximately 0.767 accuracy and 0.763 macro F1 on the development-style holdout, while logistic regression achieved lower but still competitive performance. These results showed that the feature set was capturing meaningful website-specific behavior, but they also highlighted the importance of controlling for capture imbalance and session leakage.
+
+Blind Test Results
+The main result comes from the blind evaluation on the untouched session-05 captures. On the balanced blind-test split, the random forest model achieved 0.740 window-level accuracy and 0.738 macro F1. Logistic regression performed substantially worse, and the dummy baseline was far below both learned models. These results indicate that the model generalizes to previously unseen capture sessions better than chance and better than a simple linear baseline, although the problem remains challenging.
+
+At the session level, we aggregated all window predictions from each blind-test capture using majority vote. Under this evaluation, the random forest correctly classified four of the five blind sessions, yielding 0.800 session-level accuracy. The model correctly identified ChatGPT, GitHub, Instagram, and NBC News, but misclassified Walmart as NBC News. This suggests that while the model can reliably separate several website classes, some websites still have overlapping traffic signatures under the current feature representation.
+
+Feature Importance and Ablation
+The random forest feature-importance analysis identified packet-size and direction-related features as the strongest predictors. In particular, high-ranking features included length_p90, length_max, length_median, tcp_ratio, src_443_ratio, inbound_ratio, direction_balance, and udp_ratio. These features indicate that the model is relying heavily on distributional packet-size information and the structure of bidirectional traffic exchange.
+
+We also ran ablation experiments to examine whether session-level artifact features were disproportionately influencing performance. In the balanced blind-test setup, removing capture_duration slightly improved performance rather than hurting it. Removing both capture_duration and packet_rate produced only a small reduction relative to the full feature set, while a length-and-timing-only configuration still retained substantial predictive power. This supports the conclusion that the model is not primarily relying on session duration and that size- and timing-based window statistics remain informative on their own.
+
+Discussion and Future Work
+One of the most important lessons from this project is that evaluation methodology matters as much as model selection. The earliest random window-level splits suggested near-perfect classification, but those results were not trustworthy because they allowed data from the same capture session to leak across training and testing. Session-aware evaluation and blind testing gave a much stricter and more realistic picture of model performance. This change significantly strengthened the technical credibility of the project.
+
+The blind-test results show that encrypted traffic metadata can still reveal website identity with moderate to strong accuracy, especially when analyzed over packet windows and aggregated across a full session. At the same time, the confusion between Walmart and NBC News indicates that the current features do not fully separate all websites. This may be due to overlapping use of content-delivery networks, similar protocol mixtures, or collection noise from large background-heavy sessions.
+
+There are several limitations in the current study. First, capture sizes vary substantially across sessions, which required balancing procedures to prevent some sessions from dominating the dataset. Second, the dataset includes only five websites and a modest number of sessions per class. Third, some protocol behavior shifts across sessions, especially with QUIC and modern transport negotiation, which can introduce additional variability. Finally, the current features are mostly aggregate statistics and do not explicitly model more detailed temporal sequence structure.
+
+Future work could improve the project in several directions. More capture sessions across different days, networks, and devices would strengthen generalization claims. Additional websites would make the classification problem more realistic and more difficult. More refined features, such as burst-pattern descriptors, flow-level summaries, or temporal models that preserve packet ordering, may further improve performance. Another useful extension would be testing whether the classifier remains effective after controlling more aggressively for protocol-family differences, especially TCP-versus-QUIC behavior.
+
+Conclusion
+This project investigated whether encrypted network traffic can be used to infer website origin without relying on URLs or payload contents. Using repeated Wireshark sessions from five websites, we constructed packet-window samples and extracted statistical features describing packet sizes, timing, protocol composition, and directionality. After correcting for evaluation leakage and introducing a blind test set, we found that a balanced random forest model achieved 0.740 window-level accuracy, 0.738 macro F1, and 0.800 session-level accuracy on previously unseen sessions. Feature analysis showed that packet-size and directionality features were the strongest predictors, while session-duration features were not necessary and could be removed without harming performance. Overall, the results show that encrypted traffic still carries identifiable structural signatures, while also demonstrating that careful data splitting and feature validation are necessary to make trustworthy claims.
+
+Suggested Tables And Figures
+1. Pipeline diagram showing capture, preprocessing, windowing, feature extraction, training, and blind testing.
+2. Dataset summary table listing websites, number of sessions, packet count range, and duration range.
+3. Model comparison table with dummy baseline, logistic regression, and random forest on the blind test.
+4. Confusion matrix for the balanced blind-test random forest.
+5. Feature-importance bar chart for the top random-forest features.
+6. Feature-ablation table showing all features, no capture duration, no capture duration plus packet rate, and other reduced feature sets.
+7. Optional session-level majority-vote table or bar chart showing blind-session prediction confidence.
+
+Notes To Revise Later
+- Replace approximate development metrics with the exact values you want to report.
+- Copy exact blind-test numbers from the final script output if the model configuration changes.
+- Add citations for encrypted traffic analysis, Wireshark, random forest, accuracy, and F1-score.
+- Adjust title wording if you want a more formal or more concise style.

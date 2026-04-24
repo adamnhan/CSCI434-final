@@ -1,0 +1,6 @@
+capture_name,true_label,predicted_label,window_votes,total_windows,vote_share,correct,vote_share_numeric
+chatgpt_05,chatgpt,chatgpt,19,20,0.950,True,0.95
+github_05,github,github,118,120,0.983,True,0.9833333333333333
+instagram_05,instagram,instagram,111,120,0.925,True,0.925
+nbcnews_05,nbcnews,nbcnews,90,120,0.750,True,0.75
+walmart_05,walmart,nbcnews,84,120,0.700,False,0.7

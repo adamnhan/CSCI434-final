@@ -1,0 +1,7 @@
+feature_set,model,accuracy,macro_f1
+balanced_full,random_forest,0.740,0.738
+balanced_full,logistic_regression,0.314,0.342
+balanced_full,dummy_most_frequent,0.240,0.077
+balanced_reduced,random_forest,0.734,0.736
+balanced_reduced,logistic_regression,0.424,0.465
+balanced_reduced,dummy_most_frequent,0.240,0.077

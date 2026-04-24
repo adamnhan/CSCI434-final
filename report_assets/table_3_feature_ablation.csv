@@ -1,0 +1,5 @@
+feature_set,n_features,accuracy,macro_f1
+no_capture_duration,37,0.762,0.754
+no_duration_or_rate,36,0.752,0.747
+all_features,38,0.740,0.738
+length_and_timing_only,21,0.728,0.718

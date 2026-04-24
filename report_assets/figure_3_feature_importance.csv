@@ -1,0 +1,16 @@
+feature,importance
+length_p90,0.1249
+length_max,0.0857
+length_median,0.0563
+tcp_ratio,0.0497
+src_443_ratio,0.044
+inbound_ratio,0.0437
+direction_balance,0.0413
+udp_ratio,0.0347
+length_std,0.0318
+delta_fast_ratio,0.0286
+delta_zero_ratio,0.0276
+delta_p90,0.0252
+length_min,0.0245
+length_entropy,0.0238
+delta_std,0.0238
