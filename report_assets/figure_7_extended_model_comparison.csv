@@ -1,0 +1,11 @@
+configuration,accuracy,macro_f1
+"Window RF
+blind session 05",0.778,0.78
+"Window RF +
+majority vote LOSO",0.867,
+"Session LR
+blind session 05",1.0,1.0
+"Session RF
+LOSO",0.8,0.747
+"Session linear SVM
+k=25 LOSO",0.9,0.88
